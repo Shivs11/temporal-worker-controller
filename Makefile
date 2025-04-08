@@ -221,7 +221,7 @@ install-datadog-agent:
 # Create an mTLS secret in k8s
 .PHONY: create-cloud-mtls-secret
 create-cloud-mtls-secret:
-	kubectl create secret tls temporal-cloud-mtls --namespace default \
+	kubectl create secret tls temporal-cloud-mtls-2 --namespace default \
       --cert=certs/ca.pem \
       --key=certs/ca.key
 

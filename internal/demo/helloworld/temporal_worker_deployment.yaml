@@ -10,14 +10,14 @@ spec:
   workerOptions:
     connection: dev-server
     #    temporalNamespace: "replay-2025.ktasd"
-    temporalNamespace: "worker-controller-test.a2dd6"
+    temporalNamespace: "ss-worker-controller.a2dd6"
 
   # How to cut over new workflow executions to the latest worker version
   cutover:
     strategy: Progressive
     steps:
       - rampPercentage: 1
-        pauseDuration: 5s
+        pauseDuration: 20s
       - rampPercentage: 5
         pauseDuration: 5s
       - rampPercentage: 10
@@ -66,5 +66,5 @@ metadata:
   name: dev-server
 spec:
   #  hostPort: "replay-2025.ktasd.tmprl.cloud:7233"
-  hostPort: "worker-controller-test.a2dd6.tmprl.cloud:7233"
-  mutualTLSSecret: temporal-cloud-mtls
+  hostPort: "ss-worker-controller.a2dd6.tmprl.cloud:7233"
+  mutualTLSSecret: temporal-cloud-mtls-2

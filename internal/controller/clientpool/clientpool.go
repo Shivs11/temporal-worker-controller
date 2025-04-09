@@ -7,6 +7,8 @@ package clientpool
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	_ "embed"
 	"fmt"
 	"os"
 	"sync"
@@ -51,6 +53,26 @@ func (cp *ClientPool) GetSDKClient(key ClientPoolKey) (sdkclient.Client, bool) {
 	return nil, false
 }
 
+func SystemCertPool() (*x509.CertPool, error) {
+	if sysRoots := systemRootsPool(); sysRoots != nil {
+		return sysRoots.Clone(), nil
+	}
+
+	return loadSystemRoots()
+}
+
+func systemRootsPool() *x509.CertPool {
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil
+	}
+	return pool
+}
+
+func loadSystemRoots() (*x509.CertPool, error) {
+	return x509.SystemCertPool()
+}
+
 type NewClientOptions struct {
 	TemporalNamespace string
 	K8sNamespace      string
@@ -58,6 +80,10 @@ type NewClientOptions struct {
 }
 
 func (cp *ClientPool) UpsertClient(ctx context.Context, opts NewClientOptions) (sdkclient.Client, error) {
+	fmt.Println("Temporal Namespace: ", opts.TemporalNamespace)
+	fmt.Println("Host Port: ", opts.Spec.HostPort)
+	fmt.Println("MutualTLSSecret: ", opts.Spec.MutualTLSSecret)
+
 	clientOpts := sdkclient.Options{
 		Logger:    cp.logger,
 		HostPort:  opts.Spec.HostPort,
@@ -96,12 +122,32 @@ func (cp *ClientPool) UpsertClient(ctx context.Context, opts NewClientOptions) (
 			err := fmt.Errorf("secret %s must be of type kubernetes.io/tls", secret.Name)
 			return nil, err
 		}
+
+		fmt.Println("Length of tls.crt: ", len(secret.Data["tls.crt"]))
+		fmt.Println("Length of tls.key: ", len(secret.Data["tls.key"]))
+		fmt.Println("Length of ca.crt: ", len(secret.Data["ca.crt"]))
+
 		cert, err := tls.X509KeyPair(secret.Data["tls.crt"], secret.Data["tls.key"])
 		if err != nil {
 			return nil, err
 		}
+
+		caCertPool, err := SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+
+		ok := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
+		if !ok {
+			return nil, fmt.Errorf("failed to parse ca.crt from secret %s", secret.Name)
+		}
+
 		clientOpts.ConnectionOptions.TLS = &tls.Config{
-			Certificates: []tls.Certificate{cert},
+			RootCAs:            caCertPool,
+			InsecureSkipVerify: true,
+			GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				return &cert, nil
+			},
 		}
 	}
 

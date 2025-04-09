@@ -7,7 +7,6 @@ package clientpool
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	_ "embed"
 	"fmt"
 	"os"
@@ -51,26 +50,6 @@ func (cp *ClientPool) GetSDKClient(key ClientPoolKey) (sdkclient.Client, bool) {
 		return c, true
 	}
 	return nil, false
-}
-
-func SystemCertPool() (*x509.CertPool, error) {
-	if sysRoots := systemRootsPool(); sysRoots != nil {
-		return sysRoots.Clone(), nil
-	}
-
-	return loadSystemRoots()
-}
-
-func systemRootsPool() *x509.CertPool {
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil
-	}
-	return pool
-}
-
-func loadSystemRoots() (*x509.CertPool, error) {
-	return x509.SystemCertPool()
 }
 
 type NewClientOptions struct {
@@ -132,18 +111,7 @@ func (cp *ClientPool) UpsertClient(ctx context.Context, opts NewClientOptions) (
 			return nil, err
 		}
 
-		caCertPool, err := SystemCertPool()
-		if err != nil {
-			return nil, err
-		}
-
-		ok := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
-		if !ok {
-			return nil, fmt.Errorf("failed to parse ca.crt from secret %s", secret.Name)
-		}
-
 		clientOpts.ConnectionOptions.TLS = &tls.Config{
-			RootCAs:            caCertPool,
 			InsecureSkipVerify: true,
 			GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 				return &cert, nil
